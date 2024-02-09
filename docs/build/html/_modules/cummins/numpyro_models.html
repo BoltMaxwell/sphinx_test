@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>cummins.numpyro_models &mdash; test_02 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../_static/documentation_options.js?v=01f34227"></script>
+        <script src="../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            test_02
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">sphinx_test</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">test_02</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">cummins.numpyro_models</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for cummins.numpyro_models</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Author: Maxwell Bolt</span>
+
+<span class="sd">Numpyro Bayesian Neural Network Model</span>
+<span class="sd">From example:</span>
+<span class="sd">https://num.pyro.ai/en/stable/examples/bnn.html</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;create_sliding_window&quot;</span><span class="p">,</span> <span class="s2">&quot;jnp_model1&quot;</span><span class="p">,</span> <span class="s2">&quot;jnp_model2&quot;</span><span class="p">,</span> <span class="s2">&quot;jnp_run_inference&quot;</span><span class="p">,</span> <span class="s2">&quot;jnp_predict&quot;</span><span class="p">]</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">time</span>
+
+<span class="kn">import</span> <span class="nn">jax</span>
+<span class="kn">from</span> <span class="nn">jax</span> <span class="kn">import</span> <span class="n">vmap</span><span class="p">,</span> <span class="n">jit</span>
+<span class="kn">import</span> <span class="nn">jax.numpy</span> <span class="k">as</span> <span class="nn">jnp</span>
+<span class="kn">import</span> <span class="nn">numpyro</span>
+<span class="kn">from</span> <span class="nn">numpyro</span> <span class="kn">import</span> <span class="n">handlers</span>
+<span class="kn">import</span> <span class="nn">numpyro.distributions</span> <span class="k">as</span> <span class="nn">dist</span>
+<span class="kn">from</span> <span class="nn">numpyro.infer</span> <span class="kn">import</span> <span class="n">MCMC</span><span class="p">,</span> <span class="n">NUTS</span>
+
+<span class="c1"># Function to create sliding window</span>
+<div class="viewcode-block" id="create_sliding_window">
+<a class="viewcode-back" href="../../cummins.html#cummins.numpyro_models.create_sliding_window">[docs]</a>
+<span class="k">def</span> <span class="nf">create_sliding_window</span><span class="p">(</span><span class="n">input_data</span><span class="p">,</span> <span class="n">output_data</span><span class="p">,</span> <span class="n">window_size</span><span class="p">):</span>
+    <span class="n">inputs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">outputs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">input_data</span><span class="p">)</span> <span class="o">-</span> <span class="n">window_size</span><span class="p">):</span>
+        <span class="n">inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">input_data</span><span class="p">[</span><span class="n">i</span><span class="p">:</span><span class="n">i</span><span class="o">+</span><span class="n">window_size</span><span class="p">])</span>
+        <span class="n">outputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">output_data</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="n">window_size</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">inputs</span><span class="p">),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">outputs</span><span class="p">)</span></div>
+
+
+<span class="c1"># the non-linearity we use in our neural network</span>
+<span class="k">def</span> <span class="nf">nonlin</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">tanh</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="c1"># return jax.nn.relu(x)</span>
+
+<div class="viewcode-block" id="jnp_model1">
+<a class="viewcode-back" href="../../cummins.html#cummins.numpyro_models.jnp_model1">[docs]</a>
+<span class="k">def</span> <span class="nf">jnp_model1</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">D_H</span><span class="p">,</span> <span class="n">D_Y</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    BNN using numpyro</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">N</span><span class="p">,</span> <span class="n">D_X</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">shape</span>
+
+    <span class="c1"># sample first layer (we put unit normal priors on all weights)</span>
+    <span class="n">w1</span> <span class="o">=</span> <span class="n">numpyro</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="s2">&quot;w1&quot;</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">D_X</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">D_X</span><span class="p">,</span> <span class="n">D_H</span><span class="p">))))</span>
+    <span class="k">assert</span> <span class="n">w1</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">D_X</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)</span>
+    <span class="n">z1</span> <span class="o">=</span> <span class="n">nonlin</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">w1</span><span class="p">))</span>  <span class="c1"># &lt;= first layer of activations</span>
+    <span class="k">assert</span> <span class="n">z1</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)</span>
+
+    <span class="c1"># sample second layer</span>
+    <span class="n">w2</span> <span class="o">=</span> <span class="n">numpyro</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="s2">&quot;w2&quot;</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_H</span><span class="p">))))</span>
+    <span class="k">assert</span> <span class="n">w2</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)</span>
+    <span class="n">z2</span> <span class="o">=</span> <span class="n">nonlin</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">z1</span><span class="p">,</span> <span class="n">w2</span><span class="p">))</span>  <span class="c1"># &lt;= second layer of activations</span>
+    <span class="k">assert</span> <span class="n">z2</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)</span>
+
+    <span class="c1"># sample third layer</span>
+    <span class="n">w3</span> <span class="o">=</span> <span class="n">numpyro</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="s2">&quot;w3&quot;</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_H</span><span class="p">))))</span>
+    <span class="k">assert</span> <span class="n">w3</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)</span>
+    <span class="n">z3</span> <span class="o">=</span> <span class="n">nonlin</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">z2</span><span class="p">,</span> <span class="n">w3</span><span class="p">))</span>  <span class="c1"># &lt;= second layer of activations</span>
+    <span class="k">assert</span> <span class="n">z3</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)</span>
+
+    <span class="c1"># sample fourth layer</span>
+    <span class="n">w4</span> <span class="o">=</span> <span class="n">numpyro</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="s2">&quot;w4&quot;</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_H</span><span class="p">))))</span>
+    <span class="k">assert</span> <span class="n">w4</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)</span>
+    <span class="n">z4</span> <span class="o">=</span> <span class="n">nonlin</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">z3</span><span class="p">,</span> <span class="n">w4</span><span class="p">))</span>  <span class="c1"># &lt;= second layer of activations</span>
+    <span class="k">assert</span> <span class="n">z4</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)</span>
+
+    <span class="c1"># sample fifth layer</span>
+    <span class="n">w5</span> <span class="o">=</span> <span class="n">numpyro</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="s2">&quot;w5&quot;</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_H</span><span class="p">))))</span>
+    <span class="k">assert</span> <span class="n">w5</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)</span>
+    <span class="n">z5</span> <span class="o">=</span> <span class="n">nonlin</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">z4</span><span class="p">,</span> <span class="n">w5</span><span class="p">))</span>  <span class="c1"># &lt;= second layer of activations</span>
+    <span class="k">assert</span> <span class="n">z5</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)</span>
+
+    <span class="c1"># sample final layer of weights and neural network output</span>
+    <span class="n">wf</span> <span class="o">=</span> <span class="n">numpyro</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="s2">&quot;wf&quot;</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_Y</span><span class="p">)),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_Y</span><span class="p">))))</span>
+    <span class="k">assert</span> <span class="n">wf</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_Y</span><span class="p">)</span>
+    <span class="n">zf</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">z5</span><span class="p">,</span> <span class="n">wf</span><span class="p">)</span>  <span class="c1"># &lt;= output of the neural network</span>
+    <span class="k">assert</span> <span class="n">zf</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">D_Y</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">Y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="n">zf</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">Y</span><span class="o">.</span><span class="n">shape</span>
+
+    <span class="c1"># we put a prior on the observation noise</span>
+    <span class="c1"># prec_obs = numpyro.sample(&quot;prec_obs&quot;, dist.Gamma(3.0, 1.0))</span>
+    <span class="c1"># prec_obs = numpyro.sample(&quot;prec_obs&quot;, dist.InverseGamma(3.0, 1.0))</span>
+    <span class="n">raw_prec_obs</span> <span class="o">=</span> <span class="n">numpyro</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="s2">&quot;prec_obs&quot;</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span>
+    <span class="n">prec_obs</span> <span class="o">=</span> <span class="n">raw_prec_obs</span> <span class="o">**</span> <span class="mi">2</span>
+    <span class="n">sigma_obs</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">prec_obs</span><span class="p">)</span>
+
+    <span class="c1"># observe data</span>
+    <span class="k">with</span> <span class="n">numpyro</span><span class="o">.</span><span class="n">plate</span><span class="p">(</span><span class="s2">&quot;data&quot;</span><span class="p">,</span> <span class="n">N</span><span class="p">):</span>
+        <span class="c1"># note we use to_event(1) because each observation has shape (1,)</span>
+        <span class="n">numpyro</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="s2">&quot;Y&quot;</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">zf</span><span class="p">,</span> <span class="n">sigma_obs</span><span class="p">)</span><span class="o">.</span><span class="n">to_event</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">obs</span><span class="o">=</span><span class="n">Y</span><span class="p">)</span></div>
+
+
+<span class="k">def</span> <span class="nf">layers</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">D_H</span><span class="p">,</span> <span class="n">D_Y</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+    
+    <span class="n">N</span><span class="p">,</span> <span class="n">D_X</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">shape</span>
+
+    <span class="c1"># sample first layer (we put unit normal priors on all weights)</span>
+    <span class="n">w1</span> <span class="o">=</span> <span class="n">numpyro</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;w1&quot;</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">D_X</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">D_X</span><span class="p">,</span> <span class="n">D_H</span><span class="p">))))</span>
+    <span class="k">assert</span> <span class="n">w1</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">D_X</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)</span>
+    <span class="n">z1</span> <span class="o">=</span> <span class="n">nonlin</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">w1</span><span class="p">))</span>  <span class="c1"># &lt;= first layer of activations</span>
+    <span class="k">assert</span> <span class="n">z1</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)</span>
+
+    <span class="c1"># sample second layer</span>
+    <span class="n">w2</span> <span class="o">=</span> <span class="n">numpyro</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;w2&quot;</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_H</span><span class="p">))))</span>
+    <span class="k">assert</span> <span class="n">w2</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)</span>
+    <span class="n">z2</span> <span class="o">=</span> <span class="n">nonlin</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">z1</span><span class="p">,</span> <span class="n">w2</span><span class="p">))</span>  <span class="c1"># &lt;= second layer of activations</span>
+    <span class="k">assert</span> <span class="n">z2</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)</span>
+
+    <span class="c1"># # sample third layer</span>
+    <span class="c1"># w3 = numpyro.sample(prefix + &quot;w3&quot;, dist.Normal(jnp.zeros((D_H, D_H)), jnp.ones((D_H, D_H))))</span>
+    <span class="c1"># assert w3.shape == (D_H, D_H)</span>
+    <span class="c1"># z3 = nonlin(jnp.matmul(z2, w3))  # &lt;= second layer of activations</span>
+    <span class="c1"># assert z3.shape == (N, D_H)</span>
+
+    <span class="c1"># # sample fourth layer</span>
+    <span class="c1"># w4 = numpyro.sample(prefix + &quot;w4&quot;, dist.Normal(jnp.zeros((D_H, D_H)), jnp.ones((D_H, D_H))))</span>
+    <span class="c1"># assert w4.shape == (D_H, D_H)</span>
+    <span class="c1"># z4 = nonlin(jnp.matmul(z3, w4))  # &lt;= second layer of activations</span>
+    <span class="c1"># assert z4.shape == (N, D_H)</span>
+
+    <span class="c1"># # sample fifth layer</span>
+    <span class="c1"># w5 = numpyro.sample(prefix + &quot;w5&quot;, dist.Normal(jnp.zeros((D_H, D_H)), jnp.ones((D_H, D_H))))</span>
+    <span class="c1"># assert w5.shape == (D_H, D_H)</span>
+    <span class="c1"># z5 = nonlin(jnp.matmul(z4, w5))  # &lt;= second layer of activations</span>
+    <span class="c1"># assert z5.shape == (N, D_H)</span>
+
+    <span class="c1"># sample final layer of weights and neural network output</span>
+    <span class="n">wf</span> <span class="o">=</span> <span class="n">numpyro</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;wf&quot;</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_Y</span><span class="p">)),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_Y</span><span class="p">))))</span>
+    <span class="k">assert</span> <span class="n">wf</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">D_H</span><span class="p">,</span> <span class="n">D_Y</span><span class="p">)</span>
+    <span class="n">zf</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">z2</span><span class="p">,</span> <span class="n">wf</span><span class="p">)</span>  <span class="c1"># &lt;= output of the neural network</span>
+    <span class="k">assert</span> <span class="n">zf</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">D_Y</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">Y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="n">zf</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">Y</span><span class="o">.</span><span class="n">shape</span>
+
+    <span class="k">return</span> <span class="n">zf</span>
+
+
+<div class="viewcode-block" id="jnp_model2">
+<a class="viewcode-back" href="../../cummins.html#cummins.numpyro_models.jnp_model2">[docs]</a>
+<span class="k">def</span> <span class="nf">jnp_model2</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">D_H</span><span class="p">,</span> <span class="n">D_Y</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;BNN using numpyro, outputs 2 values to form the mean and covariance </span>
+<span class="sd">    of a normal for the likelihood.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">N</span><span class="p">,</span> <span class="n">D_X</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">shape</span>
+
+    <span class="n">mean</span> <span class="o">=</span> <span class="n">layers</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">D_H</span><span class="p">,</span> <span class="n">D_Y</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;mean_&quot;</span><span class="p">)</span>
+
+    <span class="n">raw_cov</span> <span class="o">=</span> <span class="n">layers</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">D_H</span><span class="p">,</span> <span class="n">D_Y</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;cov_&quot;</span><span class="p">)</span>
+    <span class="n">cov</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">raw_cov</span><span class="p">)</span>
+
+    <span class="c1"># observe data</span>
+    <span class="k">with</span> <span class="n">numpyro</span><span class="o">.</span><span class="n">plate</span><span class="p">(</span><span class="s2">&quot;data&quot;</span><span class="p">,</span> <span class="n">N</span><span class="p">):</span>
+        <span class="n">numpyro</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="s2">&quot;Y&quot;</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">mean</span><span class="p">,</span> <span class="n">cov</span><span class="p">)</span><span class="o">.</span><span class="n">to_event</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">obs</span><span class="o">=</span><span class="n">Y</span><span class="p">)</span></div>
+
+
+<span class="c1"># helper function for HMC inference</span>
+<div class="viewcode-block" id="jnp_run_inference">
+<a class="viewcode-back" href="../../cummins.html#cummins.numpyro_models.jnp_run_inference">[docs]</a>
+<span class="k">def</span> <span class="nf">jnp_run_inference</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">rng_key</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">D_H</span><span class="p">,</span> <span class="n">num_chains</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">num_warmup</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">num_samples</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Runs NUTS on the numpyro model.&quot;&quot;&quot;</span>
+    <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="n">kernel</span> <span class="o">=</span> <span class="n">NUTS</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+    <span class="n">mcmc</span> <span class="o">=</span> <span class="n">MCMC</span><span class="p">(</span>
+        <span class="n">kernel</span><span class="p">,</span>
+        <span class="n">num_warmup</span><span class="o">=</span><span class="n">num_warmup</span><span class="p">,</span>
+        <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
+        <span class="n">num_chains</span><span class="o">=</span><span class="n">num_chains</span><span class="p">,</span>
+        <span class="n">progress_bar</span><span class="o">=</span><span class="kc">False</span> <span class="k">if</span> <span class="s2">&quot;NUMPYRO_SPHINXBUILD&quot;</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span> <span class="k">else</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">mcmc</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">rng_key</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">D_H</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">MCMC elapsed time:&quot;</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">mcmc</span><span class="o">.</span><span class="n">get_samples</span><span class="p">()</span></div>
+
+
+<span class="c1"># helper function for prediction</span>
+<div class="viewcode-block" id="jnp_predict">
+<a class="viewcode-back" href="../../cummins.html#cummins.numpyro_models.jnp_predict">[docs]</a>
+<span class="k">def</span> <span class="nf">jnp_predict</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">rng_key</span><span class="p">,</span> <span class="n">samples</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">D_H</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Predicts the output of the model given samples from the posterior&quot;&quot;&quot;</span>
+
+    <span class="n">model</span> <span class="o">=</span> <span class="n">handlers</span><span class="o">.</span><span class="n">substitute</span><span class="p">(</span><span class="n">handlers</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">rng_key</span><span class="p">),</span> <span class="n">samples</span><span class="p">)</span>
+    <span class="c1"># note that Y will be sampled in the model because we pass Y=None here</span>
+    <span class="n">model_trace</span> <span class="o">=</span> <span class="n">handlers</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="o">.</span><span class="n">get_trace</span><span class="p">(</span><span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">D_H</span><span class="o">=</span><span class="n">D_H</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">model_trace</span><span class="p">[</span><span class="s2">&quot;Y&quot;</span><span class="p">][</span><span class="s2">&quot;value&quot;</span><span class="p">]</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Maxwell Bolt.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
